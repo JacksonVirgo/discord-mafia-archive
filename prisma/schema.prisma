@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model ArchivedChannel {
+  id               String @id @default(auto()) @map("_id") @db.ObjectId
+  discordChannelId String @unique
+  title            String
+}
+
+model ArchivedGame {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+}
+
+model ArchivedMessage {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  authorDiscordId  String
+  channelId        String   @db.ObjectId
+  content          String
+  createdAt        DateTime @db.Date
+  discordMessageId String   @unique
+  isPinned         Boolean
+  repliedId        String?  @db.ObjectId
+}
+
+model Error {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  /// Field referred in an index, but found no data to define the type.
+  errorCode Json?  @unique
+}
+
+model Game {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  gameTag       String   @unique
+  hostChannelId String?
+  hosts         String[]
+  title         String
+}
+
+model GameSlot {
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  currentPlayer String
+  gameId        String? @db.ObjectId
+  isDead        Boolean
+  voteCounterId String? @db.ObjectId
+}
+
+model LookingForGroup {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  description String
+  identifier  String @unique
+  name        String
+}
+
+model Role {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  /// Field referred in an index, but found no data to define the type.
+  name Json?  @unique
+}
+
+model RoleAlignment {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  /// Field referred in an index, but found no data to define the type.
+  name Json?  @unique
+}
+
+model UserGroup {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  lfgId    String   @db.ObjectId
+  position BigInt
+  title    String
+  users    String[]
+}
+
+model Vote {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+}
+
+model VoteCounter {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  gameChannel String @unique
+}
