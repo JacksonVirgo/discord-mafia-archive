@@ -7,81 +7,137 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model ArchivedChannel {
-  id               String @id @default(auto()) @map("_id") @db.ObjectId
-  discordChannelId String @unique
-  title            String
-}
-
-model ArchivedGame {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-}
-
-model ArchivedMessage {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  authorDiscordId  String
-  channelId        String   @db.ObjectId
-  content          String
-  createdAt        DateTime @db.Date
-  discordMessageId String   @unique
-  isPinned         Boolean
-  repliedId        String?  @db.ObjectId
-}
-
+// Error Logging
 model Error {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  errorCode Json?  @unique
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  errorCode    String @unique @default(uuid())
+  errorMessage String
 }
 
-model Game {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  gameTag       String   @unique
-  hostChannelId String?
-  hosts         String[]
-  title         String
-}
-
-model GameSlot {
-  id            String  @id @default(auto()) @map("_id") @db.ObjectId
-  currentPlayer String
-  gameId        String? @db.ObjectId
-  isDead        Boolean
-  voteCounterId String? @db.ObjectId
-}
-
-model LookingForGroup {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  description String
-  identifier  String @unique
-  name        String
+// Roles
+model RoleAlignment {
+  id               String @id @default(auto()) @map("_id") @db.ObjectId
+  name             String @unique
+  Role             Role[]
+  baseWinCondition String
 }
 
 model Role {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  name Json?  @unique
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  name               String        @unique
+  uniqueWinCondition String?
+  alignment          RoleAlignment @relation(fields: [alignmentId], references: [id])
+  alignmentId        String        @db.ObjectId
+  ability            String?
+  mechanics          String[]
+  flavour            String
 }
 
-model RoleAlignment {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  name Json?  @unique
+// Archive
+model ArchivedChannel {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  discordChannelId String            @unique
+  title            String
+  messages         ArchivedMessage[]
+
+  game   Game?   @relation(fields: [gameId], references: [id])
+  gameId String? @db.ObjectId
 }
 
+model ArchivedMessage {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  author           User              @relation(fields: [userId], references: [id])
+  discordMessageId String            @unique
+  channel          ArchivedChannel   @relation(fields: [channelId], references: [id])
+  channelId        String            @db.ObjectId
+  content          String
+  createdAt        DateTime
+  isPinned         Boolean
+  repliedId        String?           @db.ObjectId
+  repliedTo        ArchivedMessage?  @relation(name: "ArchivedMessage", fields: [repliedId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  replies          ArchivedMessage[] @relation(name: "ArchivedMessage")
+  userId           String            @db.ObjectId
+}
+
+model User {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  discordId        String            @unique
+  username         String
+  archivedMessages ArchivedMessage[]
+}
+
+// Game
+model Game {
+  id      String   @id @default(auto()) @map("_id") @db.ObjectId
+  title   String?
+  gameTag String   @unique
+  hosts   String[]
+
+  gameSlots       GameSlot[]
+  ArchivedChannel ArchivedChannel[]
+  VoteCounter     VoteCounter?      @relation(fields: [voteCounterId], references: [id])
+  voteCounterId   String?           @db.ObjectId
+
+  hostChannelId String
+}
+
+// LFG
 model UserGroup {
-  id       String   @id @default(auto()) @map("_id") @db.ObjectId
-  lfgId    String   @db.ObjectId
-  position BigInt
+  id       String           @id @default(auto()) @map("_id") @db.ObjectId
   title    String
   users    String[]
+  max      Int?
+  position Int?
+  lfg      LookingForGroup? @relation(fields: [lfgId], references: [id])
+  lfgId    String?          @db.ObjectId
+}
+
+model LookingForGroup {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  identifier  String      @unique
+  name        String?
+  description String?
+  hosts       String[]
+  userGroups  UserGroup[]
+}
+
+// Vote Counter
+// Create VC
+// Replace Player
+// Kill/Revive Player
+// Add Votes
+// Add Vote Reset (aka days)
+// Add VC expiry (day end)
+
+model VoteCounter {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  gameChannel String     @unique
+  gameSlots   GameSlot[]
+
+  autoLockAt DateTime?
+  voteResets DateTime[]
+  game       Game[]
+}
+
+model GameSlot {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  currentPlayer String
+  isDead        Boolean      @default(false)
+  voteCounter   VoteCounter? @relation(fields: [voteCounterId], references: [id])
+  voteCounterId String?      @db.ObjectId
+  outgoingVotes Vote[]       @relation(name: "author")
+  incomingVotes Vote[]       @relation(name: "target")
+  game          Game         @relation(fields: [gameId], references: [id])
+  gameId        String       @db.ObjectId
+
+  playerChannelId String?
 }
 
 model Vote {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-}
-
-model VoteCounter {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  gameChannel String @unique
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  author    GameSlot @relation(fields: [authorId], references: [id], name: "author")
+  target    GameSlot @relation(fields: [targetId], references: [id], name: "target")
+  timestamp DateTime @default(now())
+  authorId  String   @db.ObjectId
+  targetId  String   @db.ObjectId
 }
